@@ -1,0 +1,69 @@
+- hosts: 192.168.1.6
+  tasks:
+  - name: configuring yum 
+    yum_repository: 
+      name: Docker 
+      description: dockerrepo 
+      baseurl: https://download.docker.com/linux/centos/7/x86_64/stable 
+      gpgcheck: no
+
+  - name: Installing Docker-ce
+    command: "yum install docker-ce --nobest -y"
+
+  - name: Installing docker python Library
+    pip: 
+      name: docker-py 
+
+  - name: Starting Docker services
+    service: 
+       name: docker 
+       state: started 
+       enabled: yes 
+
+  - name: Pulling httpd image
+    docker_image: 
+       name: httpd 
+       source: pull 
+  
+  - name: Creating directory
+    file: 
+       state: directory
+       path: /ws1
+
+  - name: Copying files
+    copy:  
+       dest: /ws1/webpage.html 
+       content: "This is my Webpage, How may i help you "
+     
+  - name: Starting Conatiner with downloaded Image
+    docker_container: 
+       name: WebServer 
+       image: httpd 
+       state: started 
+       exposed_ports: 80 
+       ports: 8080:80 
+       volumes: 
+       - /ws1:/usr/local/apache2/htdocs/
+    register: output
+
+  - name: retrieving data about container
+    debug:
+       var: output
+  
+  - name: retrieving ip of the container 
+    debug:
+       var: output.container.NetworkSettings.IPAddress    
+    register: ip    
+
+- hosts: localhost
+  vars:
+     ip: "{{ hostvars['192.168.1.6']['output']['container']['NetworkSettings']['IPAddress'] }}"
+  tasks:
+  - name: updating inventory
+    blockinfile:
+        path: "/root/ip.txt"
+        block: |
+          [Docker]
+          {{ ip }} ansible_user=root ansible_ssh_pass=redhat ansbile_connection=ssh
+
+       
